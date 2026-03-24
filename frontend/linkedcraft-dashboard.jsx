@@ -422,6 +422,12 @@ export default function LinkedCraftDashboard() {
   // LinkedIn
   const [linkedinStatus, setLinkedinStatus] = useState(null);
 
+  // API Keys
+  const [apiKeys, setApiKeys] = useState([]);
+  const [newApiKey, setNewApiKey] = useState(null); // shown once after generation
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+
   // Score
   const [scoreContent, setScoreContent] = useState("");
   const [scoreResult, setScoreResult] = useState(null);
@@ -600,6 +606,38 @@ export default function LinkedCraftDashboard() {
       setError(e.message);
     }
     setScoreLoading(false);
+  };
+
+  // ── API Keys ──
+  const fetchApiKeys = async () => {
+    try {
+      const data = await api("/auth/api-keys", { token });
+      setApiKeys(data);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const generateApiKey = async () => {
+    setApiKeyLoading(true);
+    setNewApiKey(null);
+    try {
+      const data = await api("/auth/api-keys", { method: "POST", token, body: { name: "LinkedCraft Extension" } });
+      setNewApiKey(data.key);
+      fetchApiKeys();
+    } catch (e) {
+      setError(e.message);
+    }
+    setApiKeyLoading(false);
+  };
+
+  const revokeApiKey = async (prefix) => {
+    try {
+      await api(`/auth/api-keys/${prefix}`, { method: "DELETE", token });
+      setApiKeys((prev) => prev.filter((k) => !k.key_prefix?.startsWith(prefix)));
+    } catch (e) {
+      alert(e.message);
+    }
   };
 
   // ── Auth Screen ──
@@ -1384,6 +1422,97 @@ export default function LinkedCraftDashboard() {
                 <span style={{ color: T.textDim }}>User ID</span>
                 <span style={{ color: T.textMid, fontFamily: T.mono, fontSize: "11.5px" }}>{user?.user_id}</span>
               </div>
+            </div>
+
+            {/* API Keys */}
+            <div style={card}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <div>
+                  <span style={labelStyle}>API Keys</span>
+                  <p style={{ color: T.textDim, fontSize: "12px", margin: "4px 0 0 0" }}>
+                    Use an API key to connect the Chrome extension or automate requests.
+                  </p>
+                </div>
+                <button
+                  onClick={() => { fetchApiKeys(); generateApiKey(); }}
+                  disabled={apiKeyLoading}
+                  style={{ ...btnPrimary, fontSize: "12px", padding: "9px 16px", whiteSpace: "nowrap", opacity: apiKeyLoading ? 0.5 : 1 }}
+                >
+                  {apiKeyLoading ? "Generating…" : "+ New Key"}
+                </button>
+              </div>
+
+              {/* Newly generated key — shown only once */}
+              {newApiKey && (
+                <div style={{
+                  padding: "12px 14px",
+                  background: "rgba(212,252,121,0.06)",
+                  border: `1px solid ${T.accentMid}`,
+                  borderRadius: T.radiusSm,
+                  marginBottom: "12px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ color: T.accent, fontSize: "11px", fontWeight: 700, fontFamily: T.mono }}>NEW KEY — copy it now, it won't be shown again</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(newApiKey);
+                        setCopiedKey(true);
+                        setTimeout(() => setCopiedKey(false), 2000);
+                      }}
+                      style={{ ...btnSecondary, padding: "4px 10px", fontSize: "11px", borderColor: T.accent, color: T.accent }}
+                    >
+                      {copiedKey ? "✓ Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <div style={{
+                    fontFamily: T.mono,
+                    fontSize: "12px",
+                    color: T.text,
+                    wordBreak: "break-all",
+                    padding: "8px 10px",
+                    background: T.bg,
+                    borderRadius: "6px",
+                    border: `1px solid ${T.border}`,
+                  }}>
+                    {newApiKey}
+                  </div>
+                </div>
+              )}
+
+              {/* Existing keys list */}
+              {apiKeys.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {apiKeys.map((k) => (
+                    <div key={k.key_prefix} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "8px 12px",
+                      background: T.bg,
+                      borderRadius: T.radiusSm,
+                      border: `1px solid ${T.border}`,
+                    }}>
+                      <div>
+                        <span style={{ color: T.text, fontSize: "12.5px", fontWeight: 600 }}>{k.name}</span>
+                        <span style={{ color: T.textDim, fontSize: "11px", fontFamily: T.mono, marginLeft: "10px" }}>{k.key_prefix}…</span>
+                        {k.last_used_at && (
+                          <span style={{ color: T.textDim, fontSize: "10.5px", marginLeft: "8px" }}>
+                            last used {new Date(k.last_used_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => revokeApiKey(k.key_prefix)}
+                        style={{ ...btnSecondary, padding: "4px 10px", fontSize: "11px", color: T.danger, borderColor: "transparent" }}
+                      >
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <button onClick={fetchApiKeys} style={{ ...btnSecondary, width: "100%", fontSize: "12px" }}>
+                  Load existing keys
+                </button>
+              )}
             </div>
 
             {/* LinkedIn */}
