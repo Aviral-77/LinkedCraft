@@ -126,3 +126,72 @@ class AudienceSegment(BaseModel):
     id: str
     label: str
     icon: str
+
+
+# ──────────────────────────────────────────────
+# Scheduler models
+# ──────────────────────────────────────────────
+
+class SchedulePostRequest(BaseModel):
+    content: str = Field(..., min_length=10, max_length=5000, description="Post content to schedule")
+    scheduled_at: str = Field(..., description="ISO 8601 datetime for publishing (e.g., '2026-03-25T09:00:00Z')")
+    metadata: Optional[str] = Field(None, description="Optional JSON metadata (tags, campaign, etc.)")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "content": "Here's what I learned about hiring this week...",
+                    "scheduled_at": "2026-03-25T09:00:00Z",
+                }
+            ]
+        }
+    }
+
+
+class UpdateScheduledPostRequest(BaseModel):
+    content: Optional[str] = Field(None, description="Updated post content")
+    scheduled_at: Optional[str] = Field(None, description="Updated schedule time (ISO 8601)")
+
+
+class ScheduledPostResponse(BaseModel):
+    id: str
+    content: str
+    scheduled_at: str
+    status: str
+    created_at: str
+    updated_at: Optional[str] = None
+    published_at: Optional[str] = None
+    error: Optional[str] = None
+    metadata: Optional[str] = None
+
+
+# ──────────────────────────────────────────────
+# News models
+# ──────────────────────────────────────────────
+
+class NewsTopic(BaseModel):
+    id: str
+    title: str
+    angle: str
+    suggested_framework: str
+    category: str
+    source_headline: str
+    trending_score: int = Field(..., ge=1, le=10)
+
+
+class NewsTopicsResponse(BaseModel):
+    topics: list[NewsTopic]
+    fetched_at: str
+    article_count: int
+
+
+class NewsGenerateRequest(BaseModel):
+    topic_title: str = Field(..., description="Selected topic title from /news/topics")
+    topic_angle: str = Field("", description="The angle from the topic suggestion")
+    source_headline: str = Field("", description="Source headline for context")
+    framework: Optional[str] = Field(None, description="Override the suggested framework")
+    tone: str = Field("conversational", description="Tone for the post")
+    voice_profile: Optional[str] = Field(None, description="Voice profile to apply")
+    audience_segments: list[str] = Field(default_factory=list)
+    industry: Optional[str] = Field(None)

@@ -7,12 +7,13 @@ Handles:
   - Content repurposing prompts
   - Voice analysis prompts
   - Post scoring prompts
-  - Anthropic API calls with structured JSON output
+  - Anthropic and Gemini API calls with structured JSON output
 """
 
 import json
 import httpx
 from typing import Optional
+import google.generativeai as genai
 
 from config import settings
 from data import FRAMEWORKS, AUDIENCE_SEGMENTS
@@ -21,17 +22,37 @@ from data import FRAMEWORKS, AUDIENCE_SEGMENTS
 class LinkedCraftEngine:
     """Core AI engine that powers all generation, repurposing, voice cloning, and scoring."""
 
-    def __init__(self, api_key: str, model: str):
-        self.api_key = api_key
-        self.model = model
-        self.api_url = "https://api.anthropic.com/v1/messages"
+    def __init__(self, provider: str, model: str):
+        self.provider = provider.lower()
+        
+        if self.provider == "anthropic":
+            self.api_key = settings.ANTHROPIC_API_KEY
+            self.model = model or settings.MODEL
+            self.api_url = "https://api.anthropic.com/v1/messages"
+        elif self.provider == "gemini":
+            self.api_key = settings.GEMINI_API_KEY
+            self.model = model or settings.GEMINI_MODEL
+            genai.configure(api_key=self.api_key)
+            self.gemini_model = genai.GenerativeModel(self.model)
+        else:
+            raise ValueError(f"Unsupported provider: {provider}. Use 'anthropic' or 'gemini'.")
 
     # ──────────────────────────────────────────
     # Private: API call
     # ──────────────────────────────────────────
 
     async def _call_api(self, system: str, user_message: str, max_tokens: int = None) -> str:
-        """Make a single call to the Anthropic Messages API and return the text response."""
+        """Make a single call to the AI API and return the text response."""
+        
+        if self.provider == "anthropic":
+            return await self._call_anthropic(system, user_message, max_tokens)
+        elif self.provider == "gemini":
+            return await self._call_gemini(system, user_message, max_tokens)
+        else:
+            raise ValueError(f"Unsupported provider: {self.provider}")
+
+    async def _call_anthropic(self, system: str, user_message: str, max_tokens: int = None) -> str:
+        """Make a call to the Anthropic Messages API."""
         headers = {
             "x-api-key": self.api_key,
             "content-type": "application/json",
@@ -46,12 +67,40 @@ class LinkedCraftEngine:
 
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(self.api_url, headers=headers, json=payload)
-            response.raise_for_status()
+
+            # If the API returns an error, extract the actual error message
+            if response.status_code != 200:
+                try:
+                    error_body = response.json()
+                    error_msg = error_body.get("error", {}).get("message", response.text)
+                except Exception:
+                    error_msg = response.text
+                raise Exception(
+                    f"Anthropic API error {response.status_code}: {error_msg}"
+                )
+
             data = response.json()
 
         # Extract text from content blocks
         text = "".join(block.get("text", "") for block in data.get("content", []))
         return text
+
+    async def _call_gemini(self, system: str, user_message: str, max_tokens: int = None) -> str:
+        """Make a call to the Gemini API."""
+        # Combine system and user message for Gemini
+        full_prompt = f"{system}\n\n{user_message}"
+        
+        try:
+            response = await self.gemini_model.generate_content_async(
+                full_prompt,
+                generation_config=genai.GenerationConfig(
+                    max_output_tokens=max_tokens or settings.MAX_TOKENS,
+                    temperature=0.7,
+                )
+            )
+            return response.text
+        except Exception as e:
+            raise Exception(f"Gemini API error: {str(e)}")
 
     def _parse_json(self, text: str) -> dict:
         """Safely parse JSON from API response, stripping markdown fences if present."""
