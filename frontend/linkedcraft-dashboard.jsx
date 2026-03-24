@@ -400,10 +400,15 @@ export default function LinkedCraftDashboard() {
   const [rpAngle, setRpAngle] = useState("");
   const [rpCount, setRpCount] = useState(3);
 
-  // Voice
+  // Voice / Source
   const [voiceSamples, setVoiceSamples] = useState("");
   const [voiceProfile, setVoiceProfile] = useState(null);
   const [voiceLoading, setVoiceLoading] = useState(false);
+  const [extInstalled, setExtInstalled] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [showExtModal, setShowExtModal] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // News
   const [newsTopics, setNewsTopics] = useState([]);
@@ -449,6 +454,13 @@ export default function LinkedCraftDashboard() {
     api("/auth/me", { token }).then(setUser).catch(() => {});
     api("/linkedin/status", { token }).then(setLinkedinStatus).catch(() => {});
   }, [token]);
+
+  // ── Detect Chrome extension ──
+  useEffect(() => {
+    const handler = () => setExtInstalled(true);
+    window.addEventListener("linkedcraft-ext-ready", handler);
+    return () => window.removeEventListener("linkedcraft-ext-ready", handler);
+  }, []);
 
   // ── Generate ──
   const handleGenerate = async () => {
@@ -506,6 +518,16 @@ export default function LinkedCraftDashboard() {
       setError(e.message);
     }
     setVoiceLoading(false);
+  };
+
+  const handleRefreshVoice = async () => {
+    try {
+      const userData = await api("/auth/me", { token });
+      setUser(userData);
+      if (userData.has_voice_profile) setSyncResult({ refreshed: true });
+    } catch (e) {
+      setError(e.message);
+    }
   };
 
   // ── News ──
@@ -698,7 +720,7 @@ export default function LinkedCraftDashboard() {
     { id: "generate", icon: "✍️", label: "Generate" },
     { id: "repurpose", icon: "♻️", label: "Repurpose" },
     { id: "news", icon: "📰", label: "AI News" },
-    { id: "voice", icon: "🧬", label: "Voice Clone" },
+    { id: "voice", icon: "🔗", label: "Source" },
     { id: "score", icon: "📊", label: "Score" },
     { id: "schedule", icon: "📅", label: "Schedule" },
     { id: "settings", icon: "⚙️", label: "Settings" },
@@ -795,7 +817,7 @@ export default function LinkedCraftDashboard() {
           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             <Tag color={T.accent}>{user?.tier || "free"}</Tag>
             {linkedinStatus?.connected && <Tag color={T.success}>LinkedIn</Tag>}
-            {voiceProfile && <Tag color="#c084fc">Voice</Tag>}
+            {(voiceProfile || user?.has_voice_profile) && <Tag color="#c084fc">Voice</Tag>}
           </div>
         </div>
       </div>
@@ -804,14 +826,14 @@ export default function LinkedCraftDashboard() {
       <div style={{ flex: 1, padding: "28px 36px", maxWidth: "900px", overflow: "auto" }}>
         {/* ── GENERATE TAB ── */}
         {tab === "generate" && (
-          <div style={{ animation: "fadeUp 0.3s ease", display: "flex", flexDirection: "column", gap: "22px" }}>
+          <div style={{ animation: "fadeUp 0.3s ease", display: "flex", flexDirection: "column", gap: "20px" }}>
             <div>
               <h2 style={{ color: T.text, fontSize: "20px", fontWeight: 800, margin: "0 0 4px 0", letterSpacing: "-0.02em" }}>Generate Posts</h2>
               <p style={{ color: T.textDim, fontSize: "13px", margin: 0 }}>Create LinkedIn content from a topic or idea</p>
             </div>
 
             <div>
-              <label style={labelStyle}>Topic</label>
+              <label style={labelStyle}>Topic or Idea</label>
               <textarea
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
@@ -822,84 +844,106 @@ export default function LinkedCraftDashboard() {
             </div>
 
             <div>
-              <label style={labelStyle}>Framework</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: "8px" }}>
-                {FRAMEWORKS.map((fw) => (
-                  <button
-                    key={fw.id}
-                    onClick={() => setFramework(framework === fw.id ? "" : fw.id)}
-                    style={{
-                      ...btnBase,
-                      justifyContent: "flex-start",
-                      padding: "11px 14px",
-                      borderRadius: T.radiusSm,
-                      border: `1.5px solid ${framework === fw.id ? T.borderActive : T.border}`,
-                      background: framework === fw.id ? T.accentDim : T.surface,
-                      color: framework === fw.id ? T.accent : T.textMid,
-                      fontSize: "12px",
-                      gap: "8px",
-                      textAlign: "left",
-                      width: "100%",
-                    }}
-                  >
-                    <span style={{ fontSize: "15px" }}>{fw.icon}</span>
-                    {fw.name}
-                  </button>
+              <label style={labelStyle}>Tone</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {TONES.map((t) => (
+                  <Pill key={t.id} selected={tone === t.id} onClick={() => setTone(t.id)}>
+                    {t.e} {t.name}
+                  </Pill>
                 ))}
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px" }}>
-              <div>
-                <label style={labelStyle}>Tone</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {TONES.map((t) => (
-                    <Pill key={t.id} selected={tone === t.id} onClick={() => setTone(t.id)}>
-                      {t.e} {t.name}
-                    </Pill>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Audience</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {AUDIENCES.map((a) => (
-                    <Pill
-                      key={a.id}
-                      selected={audiences.includes(a.id)}
-                      onClick={() => setAudiences((prev) => (prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id]))}
-                    >
-                      {a.icon} {a.label}
-                    </Pill>
-                  ))}
-                </div>
-              </div>
-            </div>
+            {/* Advanced toggle */}
+            <button
+              onClick={() => setShowAdvanced((p) => !p)}
+              style={{
+                ...btnBase,
+                justifyContent: "space-between",
+                padding: "10px 14px",
+                borderRadius: T.radiusSm,
+                border: `1px solid ${T.border}`,
+                background: "transparent",
+                color: T.textDim,
+                fontSize: "12px",
+                width: "100%",
+              }}
+            >
+              <span>Advanced options {showAdvanced ? "" : "(framework, audience, count)"}</span>
+              <span style={{ fontFamily: T.mono }}>{showAdvanced ? "↑ hide" : "↓ show"}</span>
+            </button>
 
-            <div>
-              <label style={labelStyle}>Variations</label>
-              <div style={{ display: "flex", gap: "6px" }}>
-                {[1, 2, 3, 5].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setPostCount(n)}
-                    style={{
-                      ...btnBase,
-                      width: "44px",
-                      height: "40px",
-                      borderRadius: T.radiusSm,
-                      border: `1.5px solid ${postCount === n ? T.borderActive : T.border}`,
-                      background: postCount === n ? T.accentDim : "transparent",
-                      color: postCount === n ? T.accent : T.textDim,
-                      fontFamily: T.mono,
-                      fontSize: "14px",
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
+            {showAdvanced && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                <div>
+                  <label style={labelStyle}>Framework <span style={{ color: T.textDim, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "7px" }}>
+                    {FRAMEWORKS.map((fw) => (
+                      <button
+                        key={fw.id}
+                        onClick={() => setFramework(framework === fw.id ? "" : fw.id)}
+                        style={{
+                          ...btnBase,
+                          justifyContent: "flex-start",
+                          padding: "9px 12px",
+                          borderRadius: T.radiusSm,
+                          border: `1.5px solid ${framework === fw.id ? T.borderActive : T.border}`,
+                          background: framework === fw.id ? T.accentDim : T.surface,
+                          color: framework === fw.id ? T.accent : T.textMid,
+                          fontSize: "11.5px",
+                          gap: "7px",
+                          textAlign: "left",
+                          width: "100%",
+                        }}
+                      >
+                        <span style={{ fontSize: "14px" }}>{fw.icon}</span>
+                        {fw.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Audience</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {AUDIENCES.map((a) => (
+                      <Pill
+                        key={a.id}
+                        selected={audiences.includes(a.id)}
+                        onClick={() => setAudiences((prev) => (prev.includes(a.id) ? prev.filter((x) => x !== a.id) : [...prev, a.id]))}
+                      >
+                        {a.icon} {a.label}
+                      </Pill>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Variations</label>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {[1, 2, 3, 5].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setPostCount(n)}
+                        style={{
+                          ...btnBase,
+                          width: "44px",
+                          height: "38px",
+                          borderRadius: T.radiusSm,
+                          border: `1.5px solid ${postCount === n ? T.borderActive : T.border}`,
+                          background: postCount === n ? T.accentDim : "transparent",
+                          color: postCount === n ? T.accent : T.textDim,
+                          fontFamily: T.mono,
+                          fontSize: "14px",
+                        }}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             <button onClick={handleGenerate} disabled={loading || !topic.trim()} style={{ ...btnPrimary, width: "100%", opacity: !topic.trim() ? 0.4 : 1 }}>
               {loading ? "Generating..." : `Generate ${postCount > 1 ? postCount + " Posts" : "Post"}`}
@@ -1017,54 +1061,203 @@ export default function LinkedCraftDashboard() {
           </div>
         )}
 
-        {/* ── VOICE TAB ── */}
+        {/* ── SOURCE TAB ── */}
         {tab === "voice" && (
-          <div style={{ animation: "fadeUp 0.3s ease", display: "flex", flexDirection: "column", gap: "22px" }}>
+          <div style={{ animation: "fadeUp 0.3s ease", display: "flex", flexDirection: "column", gap: "24px" }}>
+
+            {/* Header */}
             <div>
-              <h2 style={{ color: T.text, fontSize: "20px", fontWeight: 800, margin: "0 0 4px 0" }}>Voice Clone</h2>
-              <p style={{ color: T.textDim, fontSize: "13px", margin: 0 }}>Paste 3-5 of your LinkedIn posts to train your writing DNA</p>
+              <h2 style={{ color: T.text, fontSize: "20px", fontWeight: 800, margin: "0 0 4px 0" }}>Sync LinkedIn Voice</h2>
+              <p style={{ color: T.textDim, fontSize: "13px", margin: 0 }}>Let AI learn your writing style — posts that sound like you, every time</p>
             </div>
 
-            <div style={{ ...card, background: T.accentDim, border: `1px solid ${T.accentMid}` }}>
-              <span style={{ color: T.accent, fontSize: "12.5px", lineHeight: 1.6 }}>
-                The AI will analyze your sentence structure, vocabulary, tone patterns, and signature moves. Your voice is saved to your account and auto-applied to all future posts.
-              </span>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Your Sample Posts</label>
-              <textarea
-                value={voiceSamples}
-                onChange={(e) => setVoiceSamples(e.target.value)}
-                placeholder="Paste your LinkedIn posts here, separated by blank lines..."
-                rows={12}
-                style={inputBase}
-              />
-            </div>
-
-            <button onClick={handleVoiceAnalyze} disabled={voiceLoading || !voiceSamples.trim()} style={{ ...btnPrimary, width: "100%", opacity: !voiceSamples.trim() ? 0.4 : 1 }}>
-              {voiceLoading ? "Analyzing your voice..." : "Analyze & Clone Voice"}
-            </button>
-
-            {voiceProfile && (
-              <div style={card}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-                  <Tag color={T.success}>Voice Profile Active</Tag>
+            {/* Extension sync card */}
+            <div style={{ ...card, borderColor: extInstalled ? T.accentMid : T.border }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "16px" }}>🔗</span>
+                    <span style={{ color: T.text, fontWeight: 700, fontSize: "13.5px" }}>One-Click Sync</span>
+                    {extInstalled
+                      ? <Tag color={T.success}>Extension Ready</Tag>
+                      : <Tag color={T.textDim}>Extension Not Installed</Tag>
+                    }
+                  </div>
+                  <p style={{ color: T.textMid, fontSize: "12.5px", lineHeight: 1.65, margin: 0 }}>
+                    {extInstalled
+                      ? "Your browser extension is installed. Open the LinkedCraft Helper icon in your toolbar and click \"Sync My Posts\" — it will automatically read your last 30–50 LinkedIn posts and update your voice profile."
+                      : "Install the free LinkedCraft Helper browser extension to automatically sync your LinkedIn posts in one click. No passwords — it only reads post text."
+                    }
+                  </p>
                 </div>
-                <p style={{ color: T.textMid, fontSize: "13px", lineHeight: 1.7, margin: "0 0 14px 0" }}>{voiceProfile.voice_profile}</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
-                  {voiceProfile.key_traits?.map((t, i) => (
-                    <Tag key={i} color={T.accent}>{t}</Tag>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px", flexShrink: 0 }}>
+                  {!extInstalled && (
+                    <button onClick={() => setShowExtModal(true)} style={{ ...btnPrimary, whiteSpace: "nowrap", fontSize: "12.5px" }}>
+                      Install Extension
+                    </button>
+                  )}
+                  <button
+                    onClick={handleRefreshVoice}
+                    style={{ ...btnSecondary, whiteSpace: "nowrap", fontSize: "12px" }}
+                  >
+                    Refresh Profile
+                  </button>
+                </div>
+              </div>
+
+              {/* Step hints when extension is installed */}
+              {extInstalled && (
+                <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[
+                    "Click the LinkedCraft Helper icon in your browser toolbar",
+                    "Click \"Sync My Posts\" — it opens LinkedIn and collects your posts",
+                    "Come back here and click \"Refresh Profile\" to see your voice",
+                  ].map((step, i) => (
+                    <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                      <span style={{
+                        width: "20px", height: "20px", borderRadius: "50%",
+                        background: T.accentDim, border: `1px solid ${T.accentMid}`,
+                        color: T.accent, fontSize: "10px", fontFamily: T.mono, fontWeight: 700,
+                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                      }}>{i + 1}</span>
+                      <span style={{ color: T.textMid, fontSize: "12.5px", lineHeight: 1.55, paddingTop: "2px" }}>{step}</span>
+                    </div>
                   ))}
                 </div>
-                {voiceProfile.avoid?.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    <span style={{ color: T.textDim, fontSize: "10.5px", fontFamily: T.mono }}>AVOIDS:</span>
-                    {voiceProfile.avoid.map((a, i) => (
-                      <Tag key={i} color={T.danger}>{a}</Tag>
+              )}
+            </div>
+
+            {/* Sync / Voice result */}
+            {(syncResult || user?.has_voice_profile || voiceProfile) && (
+              <div style={{ ...card, background: "rgba(212,252,121,0.04)", borderColor: T.accentMid }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                  <Tag color={T.success}>Voice Profile Active</Tag>
+                  <span style={{ color: T.textDim, fontSize: "11px", fontFamily: T.mono }}>auto-applied to all generated posts</span>
+                </div>
+                {voiceProfile && (
+                  <>
+                    <p style={{ color: T.textMid, fontSize: "13px", lineHeight: 1.7, margin: "0 0 12px 0" }}>{voiceProfile.voice_profile}</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: voiceProfile.avoid?.length ? "10px" : 0 }}>
+                      {voiceProfile.key_traits?.map((t, i) => <Tag key={i} color={T.accent}>{t}</Tag>)}
+                    </div>
+                    {voiceProfile.avoid?.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+                        <span style={{ color: T.textDim, fontSize: "10.5px", fontFamily: T.mono }}>AVOIDS:</span>
+                        {voiceProfile.avoid.map((a, i) => <Tag key={i} color={T.danger}>{a}</Tag>)}
+                      </div>
+                    )}
+                  </>
+                )}
+                {!voiceProfile && <p style={{ color: T.textMid, fontSize: "13px", margin: 0 }}>Your voice profile is saved. Generate a post to see it in action.</p>}
+              </div>
+            )}
+
+            {/* OR divider */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ flex: 1, height: "1px", background: T.border }} />
+              <span style={{ color: T.textDim, fontSize: "11px", fontFamily: T.mono, letterSpacing: "0.05em" }}>OR</span>
+              <div style={{ flex: 1, height: "1px", background: T.border }} />
+            </div>
+
+            {/* Manual paste toggle */}
+            <div>
+              <button
+                onClick={() => setShowManualInput((p) => !p)}
+                style={{
+                  ...btnBase,
+                  justifyContent: "space-between",
+                  padding: "10px 16px",
+                  borderRadius: T.radiusSm,
+                  border: `1px solid ${T.border}`,
+                  background: "transparent",
+                  color: T.textDim,
+                  fontSize: "12.5px",
+                  width: "100%",
+                }}
+              >
+                <span>Paste posts manually</span>
+                <span style={{ fontFamily: T.mono, fontSize: "11px" }}>{showManualInput ? "↑ hide" : "↓ show"}</span>
+              </button>
+
+              {showManualInput && (
+                <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <div style={{ ...card, background: T.accentDim, border: `1px solid ${T.accentMid}`, padding: "12px 14px" }}>
+                    <span style={{ color: T.accent, fontSize: "12px", lineHeight: 1.6 }}>
+                      Paste 3–5 of your best LinkedIn posts. The AI will analyze your sentence structure, vocabulary, and tone patterns.
+                    </span>
+                  </div>
+                  <textarea
+                    value={voiceSamples}
+                    onChange={(e) => setVoiceSamples(e.target.value)}
+                    placeholder="Paste your LinkedIn posts here, separated by blank lines…"
+                    rows={10}
+                    style={inputBase}
+                  />
+                  <button
+                    onClick={handleVoiceAnalyze}
+                    disabled={voiceLoading || !voiceSamples.trim()}
+                    style={{ ...btnPrimary, width: "100%", opacity: !voiceSamples.trim() ? 0.4 : 1 }}
+                  >
+                    {voiceLoading ? "Analyzing your voice…" : "Analyze & Save Voice"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Extension install modal */}
+            {showExtModal && (
+              <div
+                style={{
+                  position: "fixed", inset: 0,
+                  background: "rgba(0,0,0,0.75)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 1000,
+                }}
+                onClick={(e) => e.target === e.currentTarget && setShowExtModal(false)}
+              >
+                <div style={{ ...card, width: "440px", padding: "28px", animation: "fadeUp 0.2s ease" }}>
+                  <h3 style={{ color: T.text, fontSize: "17px", fontWeight: 800, margin: "0 0 10px 0" }}>
+                    Install LinkedCraft Helper
+                  </h3>
+                  <p style={{ color: T.textMid, fontSize: "12.5px", lineHeight: 1.7, margin: "0 0 18px 0" }}>
+                    The Chrome extension securely reads your post text from LinkedIn's activity page — no passwords, no private messages, no data stored in the extension.
+                  </p>
+
+                  <div style={{ ...card, background: T.bg, padding: "14px 16px", marginBottom: "20px" }}>
+                    <span style={labelStyle}>How to install (developer mode)</span>
+                    {[
+                      "Download or clone the LinkedCraft project",
+                      "Open Chrome → chrome://extensions → enable Developer Mode",
+                      "Click \"Load unpacked\" → select the chrome-extension/ folder",
+                      "Pin the extension and come back here to sync",
+                    ].map((step, i) => (
+                      <div key={i} style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "flex-start" }}>
+                        <span style={{
+                          color: T.accent, fontFamily: T.mono, fontSize: "10px", fontWeight: 700,
+                          background: T.accentDim, border: `1px solid ${T.accentMid}`,
+                          width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center", marginTop: "1px",
+                        }}>{i + 1}</span>
+                        <span style={{ color: T.textMid, fontSize: "12px", lineHeight: 1.55 }}>{step}</span>
+                      </div>
                     ))}
                   </div>
-                )}
+
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button onClick={() => setShowExtModal(false)} style={{ ...btnSecondary, flex: 1 }}>
+                      Close
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowExtModal(false);
+                        setShowManualInput(true);
+                      }}
+                      style={{ ...btnSecondary, flex: 1 }}
+                    >
+                      Paste manually instead
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1195,7 +1388,7 @@ export default function LinkedCraftDashboard() {
 
             {/* LinkedIn */}
             <div style={card}>
-              <span style={labelStyle}>LinkedIn Connection</span>
+              <span style={labelStyle}>LinkedIn Publishing</span>
               <div style={{ marginTop: "10px" }}>
                 {linkedinStatus?.connected ? (
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1204,13 +1397,13 @@ export default function LinkedCraftDashboard() {
                     <span style={{ color: T.textDim, fontSize: "11px", fontFamily: T.mono }}>ID: {linkedinStatus.person_id}</span>
                   </div>
                 ) : (
-                  <div>
-                    <p style={{ color: T.textMid, fontSize: "12.5px", margin: "0 0 12px 0" }}>
-                      Connect your LinkedIn to publish posts directly from LinkedCraft.
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+                    <p style={{ color: T.textMid, fontSize: "12.5px", margin: 0 }}>
+                      Connect to publish posts directly from LinkedCraft.
                     </p>
                     <button
                       onClick={() => window.open(`${API}/linkedin/auth`, "_blank")}
-                      style={{ ...btnPrimary, fontSize: "12.5px" }}
+                      style={{ ...btnPrimary, fontSize: "12px", padding: "9px 16px", whiteSpace: "nowrap" }}
                     >
                       Connect LinkedIn
                     </button>
@@ -1221,12 +1414,24 @@ export default function LinkedCraftDashboard() {
 
             {/* Voice */}
             <div style={card}>
-              <span style={labelStyle}>Voice Profile</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={labelStyle}>Voice Profile</span>
+                {(voiceProfile || user?.has_voice_profile) && (
+                  <button onClick={() => setTab("voice")} style={{ ...btnSecondary, padding: "5px 12px", fontSize: "11px" }}>
+                    Manage
+                  </button>
+                )}
+              </div>
               <div style={{ marginTop: "10px" }}>
                 {voiceProfile || user?.has_voice_profile ? (
                   <Tag color={T.success}>Active — auto-applied to all posts</Tag>
                 ) : (
-                  <span style={{ color: T.textDim, fontSize: "12.5px" }}>Not configured. Go to Voice Clone tab to set up.</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+                    <span style={{ color: T.textDim, fontSize: "12.5px" }}>Not configured yet.</span>
+                    <button onClick={() => setTab("voice")} style={{ ...btnPrimary, fontSize: "12px", padding: "9px 16px", whiteSpace: "nowrap" }}>
+                      Sync Voice →
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

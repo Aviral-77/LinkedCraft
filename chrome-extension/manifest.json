@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedCraft Helper",
+  "version": "1.0",
+  "description": "Sync your LinkedIn posts to LinkedCraft for AI voice cloning",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "http://localhost:8000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LinkedCraft Helper"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:*/*", "http://127.0.0.1:*/*"],
+      "js": ["detect.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
