@@ -1,0 +1,55 @@
+#-----DE/System ---
+.vscode/
+.idea/
+.DS_Store
+*.swp
+thumbs.db
+
+# --- Node/Frontend (Vite) ---
+node_modules/
+dist/
+dist-ssr/
+*.local
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Python/Conda ---
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Logs & Databases ---
+*.log
+*.sqlite
+*.db
+
+# --- Secrets ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+EOF
