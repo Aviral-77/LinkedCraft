@@ -304,6 +304,35 @@ async def linkedin_status(user: dict = Depends(get_current_user)):
     }
 
 
+class SyncPostsRequest(BaseModel):
+    posts: list[str] = Field(..., description="LinkedIn post texts collected by the Chrome extension")
+
+
+@app.post("/linkedin/sync-posts", tags=["LinkedIn"])
+async def sync_linkedin_posts(req: SyncPostsRequest, user: dict = Depends(require_rate_limit)):
+    """
+    Accept posts synced from the LinkedCraft Chrome extension.
+    Runs voice analysis on the posts and saves the profile to the user's account.
+    Called automatically by the extension after it scrapes the user's LinkedIn activity.
+    """
+    posts = [p.strip() for p in req.posts if p and p.strip()]
+    if not posts:
+        raise HTTPException(status_code=400, detail="No valid posts provided")
+
+    sample_posts = "\n\n---\n\n".join(posts[:50])
+
+    try:
+        result = await engine.analyze_voice(sample_posts=sample_posts)
+        update_user_profile(user_id=user["user_id"], voice_profile=result["voice_profile"])
+        return {
+            "status": "synced",
+            "posts_analyzed": len(posts[:50]),
+            "voice_profile": result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ══════════════════════════════════════════════
 # GENERATION ENDPOINTS (protected + rate limited)
 # ══════════════════════════════════════════════
