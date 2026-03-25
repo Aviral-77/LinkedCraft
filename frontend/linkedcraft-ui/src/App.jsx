@@ -372,7 +372,7 @@ function PostCard({ post, idx, token }) {
 
 export default function LinkedCraftDashboard() {
   // Auth state
-  const [token, setToken] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem("linkedcraft_token") || null);
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("login");
   const [authEmail, setAuthEmail] = useState("");
@@ -448,6 +448,7 @@ export default function LinkedCraftDashboard() {
       const data = await api(path, { method: "POST", body });
       setToken(data.token);
       setUser(data);
+      localStorage.setItem("linkedcraft_token", data.token);
     } catch (e) {
       setAuthError(e.message);
     }
@@ -1264,10 +1265,10 @@ export default function LinkedCraftDashboard() {
                   <div style={{ ...card, background: T.bg, padding: "14px 16px", marginBottom: "20px" }}>
                     <span style={labelStyle}>How to install (developer mode)</span>
                     {[
-                      "Download or clone the LinkedCraft project",
                       "Open Chrome → chrome://extensions → enable Developer Mode",
-                      "Click \"Load unpacked\" → select the chrome-extension/ folder",
-                      "Pin the extension and come back here to sync",
+                      "Click \"Load unpacked\" → select the chrome-extension/ folder in the project",
+                      "Pin the LinkedCraft Helper icon to your toolbar",
+                      "Stay logged in here — the extension picks up your session automatically",
                     ].map((step, i) => (
                       <div key={i} style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "flex-start" }}>
                         <span style={{
@@ -1570,6 +1571,7 @@ export default function LinkedCraftDashboard() {
               onClick={() => {
                 setToken(null);
                 setUser(null);
+                localStorage.removeItem("linkedcraft_token");
               }}
               style={{ ...btnSecondary, color: T.danger, borderColor: T.danger, width: "fit-content" }}
             >
