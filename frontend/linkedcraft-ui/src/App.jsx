@@ -4,25 +4,25 @@ const API = "http://localhost:8000";
 
 // ─── Design Tokens ───
 const T = {
-  bg: "#08090d",
-  surface: "#111318",
-  surfaceHover: "#181b22",
-  border: "#1f222b",
-  borderActive: "#d4fc79",
-  accent: "#d4fc79",
-  accentDim: "rgba(212,252,121,0.08)",
-  accentMid: "rgba(212,252,121,0.15)",
-  text: "#e8eaf0",
-  textMid: "#9199a8",
-  textDim: "#545d6e",
-  danger: "#ff6b6b",
-  dangerDim: "rgba(255,107,107,0.1)",
-  success: "#6bffb8",
-  warn: "#ffb86b",
-  radius: "12px",
-  radiusSm: "8px",
-  font: "'Satoshi', 'DM Sans', sans-serif",
-  mono: "'JetBrains Mono', 'DM Mono', monospace",
+  bg: "#000000",
+  surface: "#0a0a0a",
+  surfaceHover: "#111111",
+  border: "#1c1c1c",
+  borderActive: "#2563eb",
+  accent: "#2563eb",
+  accentDim: "rgba(37,99,235,0.08)",
+  accentMid: "rgba(37,99,235,0.18)",
+  text: "#ffffff",
+  textMid: "#a1a1aa",
+  textDim: "#52525b",
+  danger: "#ef4444",
+  dangerDim: "rgba(239,68,68,0.08)",
+  success: "#22c55e",
+  warn: "#f59e0b",
+  radius: "10px",
+  radiusSm: "6px",
+  font: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  mono: "'JetBrains Mono', 'SF Mono', monospace",
 };
 
 const FRAMEWORKS = [
@@ -94,17 +94,18 @@ const btnBase = {
 
 const btnPrimary = {
   ...btnBase,
-  background: `linear-gradient(135deg, ${T.accent}, #b8e86e)`,
-  color: T.bg,
-  padding: "12px 24px",
+  background: T.accent,
+  color: "#ffffff",
+  padding: "11px 22px",
   borderRadius: T.radiusSm,
-  fontSize: "13.5px",
-  letterSpacing: "0.02em",
+  fontSize: "13px",
+  fontWeight: 600,
+  letterSpacing: "0.01em",
 };
 
 const btnSecondary = {
   ...btnBase,
-  background: T.surface,
+  background: "transparent",
   color: T.textMid,
   border: `1px solid ${T.border}`,
   padding: "10px 18px",
@@ -114,26 +115,26 @@ const btnSecondary = {
 
 const inputBase = {
   width: "100%",
-  padding: "11px 14px",
+  padding: "10px 13px",
   borderRadius: T.radiusSm,
-  border: `1.5px solid ${T.border}`,
-  background: T.bg,
+  border: `1px solid ${T.border}`,
+  background: T.surface,
   color: T.text,
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontFamily: T.font,
   outline: "none",
-  transition: "border-color 0.2s",
+  transition: "border-color 0.15s",
   boxSizing: "border-box",
 };
 
 const labelStyle = {
   color: T.textDim,
-  fontSize: "10.5px",
-  fontWeight: 700,
+  fontSize: "10px",
+  fontWeight: 600,
   fontFamily: T.mono,
-  letterSpacing: "0.1em",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  marginBottom: "8px",
+  marginBottom: "7px",
   display: "block",
 };
 
@@ -141,7 +142,7 @@ const card = {
   background: T.surface,
   borderRadius: T.radius,
   border: `1px solid ${T.border}`,
-  padding: "20px",
+  padding: "18px",
 };
 
 // ─── Components ───
@@ -152,12 +153,13 @@ function Pill({ selected, onClick, children }) {
       onClick={onClick}
       style={{
         ...btnBase,
-        padding: "6px 14px",
-        borderRadius: "20px",
+        padding: "5px 13px",
+        borderRadius: "4px",
         fontSize: "12px",
-        border: `1.5px solid ${selected ? T.borderActive : T.border}`,
+        fontWeight: 500,
+        border: `1px solid ${selected ? T.accent : T.border}`,
         background: selected ? T.accentDim : "transparent",
-        color: selected ? T.accent : T.textDim,
+        color: selected ? "#ffffff" : T.textDim,
       }}
     >
       {children}
@@ -169,14 +171,16 @@ function Tag({ color = T.accent, children }) {
   return (
     <span
       style={{
-        fontSize: "10.5px",
+        fontSize: "10px",
         fontFamily: T.mono,
         fontWeight: 600,
-        padding: "3px 9px",
-        borderRadius: "6px",
-        background: `${color}15`,
+        padding: "2px 8px",
+        borderRadius: "4px",
+        border: `1px solid ${color}30`,
+        background: `${color}10`,
         color,
         display: "inline-block",
+        letterSpacing: "0.02em",
       }}
     >
       {children}
@@ -658,51 +662,52 @@ export default function LinkedCraftDashboard() {
         }}
       >
         <link
-          href="https://fonts.googleapis.com/css2?family=Satoshi:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
         <style>{`
-          @keyframes ldPulse { 0%,80%,100%{opacity:.2;transform:scale(.8)} 40%{opacity:1;transform:scale(1.2)} }
-          @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-          input:focus { border-color: ${T.accent} !important; }
+          * { box-sizing: border-box; }
+          @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+          input:focus { border-color: ${T.accent} !important; outline: none; }
         `}</style>
 
         <div
           style={{
-            width: "380px",
-            padding: "40px",
+            width: "360px",
+            padding: "36px",
             background: T.surface,
-            borderRadius: "20px",
+            borderRadius: T.radius,
             border: `1px solid ${T.border}`,
-            animation: "fadeUp 0.4s ease",
+            animation: "fadeUp 0.3s ease",
           }}
         >
           {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "32px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "28px" }}>
             <div
               style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "12px",
-                background: `linear-gradient(135deg, ${T.accent}, #8ed63a)`,
+                width: "34px",
+                height: "34px",
+                borderRadius: T.radiusSm,
+                background: T.accent,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "20px",
-                fontWeight: 900,
-                color: T.bg,
+                fontSize: "16px",
+                fontWeight: 700,
+                color: "#ffffff",
+                flexShrink: 0,
               }}
             >
               L
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: "18px", color: T.text, letterSpacing: "-0.02em" }}>LinkedCraft</div>
-              <div style={{ fontSize: "10.5px", color: T.textDim, fontFamily: T.mono }}>AI Post Engine</div>
+              <div style={{ fontWeight: 700, fontSize: "16px", color: T.text, letterSpacing: "-0.01em" }}>LinkedCraft</div>
+              <div style={{ fontSize: "10px", color: T.textDim, fontFamily: T.mono, marginTop: "1px" }}>AI Post Engine</div>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div style={{ display: "flex", gap: "0", marginBottom: "28px", borderRadius: T.radiusSm, overflow: "hidden", border: `1px solid ${T.border}` }}>
+          {/* Mode toggle */}
+          <div style={{ display: "flex", gap: "4px", marginBottom: "24px", padding: "3px", background: T.bg, borderRadius: T.radiusSm, border: `1px solid ${T.border}` }}>
             {["login", "register"].map((m) => (
               <button
                 key={m}
@@ -710,12 +715,14 @@ export default function LinkedCraftDashboard() {
                 style={{
                   ...btnBase,
                   flex: 1,
-                  padding: "10px",
-                  fontSize: "12.5px",
-                  background: authMode === m ? T.accentDim : "transparent",
-                  color: authMode === m ? T.accent : T.textDim,
-                  borderRadius: 0,
+                  padding: "8px",
+                  fontSize: "12px",
+                  background: authMode === m ? T.surface : "transparent",
+                  color: authMode === m ? T.text : T.textDim,
+                  borderRadius: "4px",
+                  border: authMode === m ? `1px solid ${T.border}` : "1px solid transparent",
                   textTransform: "capitalize",
+                  fontWeight: authMode === m ? 600 : 400,
                 }}
               >
                 {m}
@@ -771,15 +778,20 @@ export default function LinkedCraftDashboard() {
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.font, display: "flex" }}>
       <link
-        href="https://fonts.googleapis.com/css2?family=Satoshi:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet"
       />
       <style>{`
-        @keyframes ldPulse { 0%,80%,100%{opacity:.2;transform:scale(.8)} 40%{opacity:1;transform:scale(1.2)} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        * { box-sizing: border-box; }
+        @keyframes ldPulse { 0%,80%,100%{opacity:.15;transform:scale(.75)} 40%{opacity:1;transform:scale(1)} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         input:focus, textarea:focus, select:focus { border-color: ${T.accent} !important; outline: none; }
         textarea { resize: vertical; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 3px; }
+        ::selection { background: ${T.accentDim}; color: ${T.text}; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${T.border}; border-radius: 2px; }
+        button { cursor: pointer; }
       `}</style>
 
       {/* ── Sidebar ── */}
@@ -796,31 +808,32 @@ export default function LinkedCraftDashboard() {
         }}
       >
         {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "0 8px", marginBottom: "32px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "9px", padding: "0 6px", marginBottom: "28px" }}>
           <div
             style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "9px",
-              background: `linear-gradient(135deg, ${T.accent}, #8ed63a)`,
+              width: "28px",
+              height: "28px",
+              borderRadius: T.radiusSm,
+              background: T.accent,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "16px",
-              fontWeight: 900,
-              color: T.bg,
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#ffffff",
+              flexShrink: 0,
             }}
           >
             L
           </div>
           <div>
-            <div style={{ fontWeight: 800, fontSize: "14.5px", color: T.text, letterSpacing: "-0.02em" }}>LinkedCraft</div>
-            <div style={{ fontSize: "9.5px", color: T.textDim, fontFamily: T.mono }}>v3.0</div>
+            <div style={{ fontWeight: 700, fontSize: "13.5px", color: T.text, letterSpacing: "-0.01em" }}>LinkedCraft</div>
+            <div style={{ fontSize: "9px", color: T.textDim, fontFamily: T.mono, marginTop: "1px" }}>AI Post Engine</div>
           </div>
         </div>
 
         {/* Nav */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px", flex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1px", flex: 1 }}>
           {NAV.map((n) => (
             <button
               key={n.id}
@@ -831,15 +844,17 @@ export default function LinkedCraftDashboard() {
               style={{
                 ...btnBase,
                 justifyContent: "flex-start",
-                padding: "10px 14px",
+                padding: "9px 12px",
                 borderRadius: T.radiusSm,
                 background: tab === n.id ? T.accentDim : "transparent",
-                color: tab === n.id ? T.accent : T.textMid,
-                fontSize: "13px",
+                color: tab === n.id ? "#ffffff" : T.textMid,
+                fontSize: "12.5px",
+                fontWeight: tab === n.id ? 600 : 400,
                 width: "100%",
+                borderLeft: tab === n.id ? `2px solid ${T.accent}` : "2px solid transparent",
               }}
             >
-              <span style={{ fontSize: "15px", width: "22px" }}>{n.icon}</span>
+              <span style={{ fontSize: "14px", width: "20px", opacity: tab === n.id ? 1 : 0.6 }}>{n.icon}</span>
               {n.label}
             </button>
           ))}
@@ -1180,7 +1195,7 @@ export default function LinkedCraftDashboard() {
 
                 {/* Personality archetypes — hero section */}
                 {persona?.personality?.length > 0 && (
-                  <div style={{ ...card, background: "rgba(212,252,121,0.04)", borderColor: T.accentMid }}>
+                  <div style={{ ...card, background: "rgba(37,99,235,0.04)", borderColor: T.accentMid }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                       <Tag color={T.success}>Your LinkedIn DNA</Tag>
                       <span style={{ color: T.textDim, fontSize: "11px", fontFamily: T.mono }}>auto-applied to every post you generate</span>
@@ -1190,7 +1205,7 @@ export default function LinkedCraftDashboard() {
                         <span key={i} style={{
                           padding: "6px 16px",
                           borderRadius: "20px",
-                          background: `linear-gradient(135deg, ${T.accentDim}, rgba(212,252,121,0.12))`,
+                          background: `linear-gradient(135deg, ${T.accentDim}, rgba(37,99,235,0.12))`,
                           border: `1px solid ${T.accentMid}`,
                           color: T.accent,
                           fontSize: "13px",
@@ -1539,7 +1554,7 @@ export default function LinkedCraftDashboard() {
               {newApiKey && (
                 <div style={{
                   padding: "12px 14px",
-                  background: "rgba(212,252,121,0.06)",
+                  background: "rgba(37,99,235,0.06)",
                   border: `1px solid ${T.accentMid}`,
                   borderRadius: T.radiusSm,
                   marginBottom: "12px",
