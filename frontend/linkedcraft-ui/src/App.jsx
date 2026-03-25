@@ -406,6 +406,7 @@ export default function LinkedCraftDashboard() {
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [extInstalled, setExtInstalled] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
+  const [persona, setPersona] = useState(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [showExtModal, setShowExtModal] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -460,6 +461,7 @@ export default function LinkedCraftDashboard() {
     if (!token) return;
     api("/auth/me", { token }).then(setUser).catch(() => {});
     api("/linkedin/status", { token }).then(setLinkedinStatus).catch(() => {});
+    api("/auth/me", { token }).then((u) => { setUser(u); if (u.persona) setPersona(u.persona); }).catch(() => {});
   }, [token]);
 
   // ── Detect Chrome extension ──
@@ -531,6 +533,7 @@ export default function LinkedCraftDashboard() {
     try {
       const userData = await api("/auth/me", { token });
       setUser(userData);
+      if (userData.persona) setPersona(userData.persona);
       if (userData.has_voice_profile) setSyncResult({ refreshed: true });
     } catch (e) {
       setError(e.message);
@@ -853,10 +856,15 @@ export default function LinkedCraftDashboard() {
           }}
         >
           <div style={{ fontSize: "12.5px", color: T.text, fontWeight: 600, marginBottom: "4px" }}>{user?.name || user?.email}</div>
-          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          {persona?.personality?.length > 0 && (
+            <div style={{ fontSize: "10.5px", color: T.accent, fontFamily: T.mono, marginBottom: "5px", letterSpacing: "0.02em" }}>
+              {persona.personality.join(" · ")}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
             <Tag color={T.accent}>{user?.tier || "free"}</Tag>
             {linkedinStatus?.connected && <Tag color={T.success}>LinkedIn</Tag>}
-            {(voiceProfile || user?.has_voice_profile) && <Tag color="#c084fc">Voice</Tag>}
+            {(voiceProfile || user?.has_voice_profile || persona) && <Tag color="#c084fc">Voice</Tag>}
           </div>
         </div>
       </div>
@@ -1166,28 +1174,112 @@ export default function LinkedCraftDashboard() {
               )}
             </div>
 
-            {/* Sync / Voice result */}
-            {(syncResult || user?.has_voice_profile || voiceProfile) && (
-              <div style={{ ...card, background: "rgba(212,252,121,0.04)", borderColor: T.accentMid }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                  <Tag color={T.success}>Voice Profile Active</Tag>
-                  <span style={{ color: T.textDim, fontSize: "11px", fontFamily: T.mono }}>auto-applied to all generated posts</span>
-                </div>
-                {voiceProfile && (
-                  <>
-                    <p style={{ color: T.textMid, fontSize: "13px", lineHeight: 1.7, margin: "0 0 12px 0" }}>{voiceProfile.voice_profile}</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: voiceProfile.avoid?.length ? "10px" : 0 }}>
-                      {voiceProfile.key_traits?.map((t, i) => <Tag key={i} color={T.accent}>{t}</Tag>)}
+            {/* ── Rich Persona Profile Card ── */}
+            {(persona || user?.has_voice_profile || voiceProfile) && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+                {/* Personality archetypes — hero section */}
+                {persona?.personality?.length > 0 && (
+                  <div style={{ ...card, background: "rgba(212,252,121,0.04)", borderColor: T.accentMid }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+                      <Tag color={T.success}>Your LinkedIn DNA</Tag>
+                      <span style={{ color: T.textDim, fontSize: "11px", fontFamily: T.mono }}>auto-applied to every post you generate</span>
                     </div>
-                    {voiceProfile.avoid?.length > 0 && (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-                        <span style={{ color: T.textDim, fontSize: "10.5px", fontFamily: T.mono }}>AVOIDS:</span>
-                        {voiceProfile.avoid.map((a, i) => <Tag key={i} color={T.danger}>{a}</Tag>)}
-                      </div>
-                    )}
-                  </>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "6px" }}>
+                      {persona.personality.map((p, i) => (
+                        <span key={i} style={{
+                          padding: "6px 16px",
+                          borderRadius: "20px",
+                          background: `linear-gradient(135deg, ${T.accentDim}, rgba(212,252,121,0.12))`,
+                          border: `1px solid ${T.accentMid}`,
+                          color: T.accent,
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          letterSpacing: "0.01em",
+                        }}>
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 )}
-                {!voiceProfile && <p style={{ color: T.textMid, fontSize: "13px", margin: 0 }}>Your voice profile is saved. Generate a post to see it in action.</p>}
+
+                {/* Interests + Expertise */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  {persona?.interests?.length > 0 && (
+                    <div style={card}>
+                      <span style={labelStyle}>Core Interests</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "8px" }}>
+                        {persona.interests.map((item, i) => (
+                          <Tag key={i} color="#60a5fa">{item}</Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {persona?.expertise_areas?.length > 0 && (
+                    <div style={card}>
+                      <span style={labelStyle}>Expertise</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "8px" }}>
+                        {persona.expertise_areas.map((item, i) => (
+                          <Tag key={i} color="#a78bfa">{item}</Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content themes */}
+                {persona?.content_themes?.length > 0 && (
+                  <div style={card}>
+                    <span style={labelStyle}>What you write about</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px" }}>
+                      {persona.content_themes.map((theme, i) => (
+                        <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <span style={{ color: T.accent, fontFamily: T.mono, fontSize: "10px" }}>→</span>
+                          <span style={{ color: T.textMid, fontSize: "12.5px" }}>{theme}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Writing traits + audience */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  {persona?.key_traits?.length > 0 && (
+                    <div style={card}>
+                      <span style={labelStyle}>Writing Style</span>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "5px", marginTop: "8px" }}>
+                        {persona.key_traits.map((t, i) => (
+                          <div key={i} style={{ color: T.textMid, fontSize: "11.5px", lineHeight: 1.4 }}>
+                            <span style={{ color: T.accent }}>✓ </span>{t}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {persona?.audience_fit?.length > 0 && (
+                    <div style={card}>
+                      <span style={labelStyle}>Your Audience</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "8px" }}>
+                        {persona.audience_fit.map((a, i) => (
+                          <Tag key={i} color={T.warn}>{a}</Tag>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Fallback — voice only, no full persona yet */}
+                {!persona && (voiceProfile || user?.has_voice_profile) && (
+                  <div style={{ ...card }}>
+                    <Tag color={T.success}>Voice Profile Active</Tag>
+                    {voiceProfile && (
+                      <p style={{ color: T.textMid, fontSize: "13px", lineHeight: 1.7, margin: "10px 0 0 0" }}>
+                        {voiceProfile.voice_profile}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

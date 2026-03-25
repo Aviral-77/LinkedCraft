@@ -121,8 +121,9 @@ class LinkedCraftEngine:
         voice_profile: Optional[str] = None,
         audience_segments: Optional[list[str]] = None,
         industry: Optional[str] = None,
+        persona: Optional[dict] = None,
     ) -> str:
-        """Build the system prompt with voice, audience, and industry context."""
+        """Build the system prompt with voice, persona, audience, and industry context."""
 
         prompt = """You are an elite LinkedIn ghostwriter and content strategist. Your job is to generate high-performing LinkedIn posts that feel authentic, human, and engaging — never generic or AI-sounding.
 
@@ -140,16 +141,22 @@ CRITICAL RULES:
         if voice_profile and voice_profile.strip():
             prompt += f"\n\nVOICE PROFILE — Match this writing style closely:\n{voice_profile}"
 
+        if persona:
+            if persona.get("personality"):
+                prompt += f"\n\nAUTHOR PERSONA: {', '.join(persona['personality'])}. Write with this identity — let their worldview, confidence, and areas of passion come through naturally."
+            if persona.get("interests"):
+                prompt += f"\n\nCORE INTERESTS: {', '.join(persona['interests'])}. Draw on these naturally when relevant — use domain-specific examples, current trends in these areas, and language that insiders would recognize."
+            if persona.get("expertise_areas"):
+                prompt += f"\n\nEXPERTISE: {', '.join(persona['expertise_areas'])}. Write with the authority of someone who has lived these topics, not just read about them."
+            if persona.get("avoid"):
+                prompt += f"\n\nNEVER write: {', '.join(persona['avoid'])}."
+
         if audience_segments:
-            # Resolve IDs to labels
             labels = []
             for seg_id in audience_segments:
                 match = next((s for s in AUDIENCE_SEGMENTS if s["id"] == seg_id), None)
-                if match:
-                    labels.append(match["label"])
-                else:
-                    labels.append(seg_id)
-            prompt += f"\n\nTARGET AUDIENCE: {', '.join(labels)}. Tailor the content, examples, and language to resonate with this audience. Use references and pain points they'd recognize."
+                labels.append(match["label"] if match else seg_id)
+            prompt += f"\n\nTARGET AUDIENCE: {', '.join(labels)}. Tailor the content, examples, and language to resonate with this audience."
 
         if industry:
             prompt += f"\n\nINDUSTRY CONTEXT: {industry}. Use industry-specific examples, trends, and terminology where natural."
@@ -249,6 +256,38 @@ Sample posts:
 Respond ONLY with valid JSON (no markdown, no explanation). Format:
 {{"voice_profile": "A detailed paragraph describing how this person writes, their style, quirks, and patterns that should be replicated", "key_traits": ["trait1", "trait2", "trait3", "trait4", "trait5"], "avoid": ["things this person would never write"]}}"""
 
+    def _build_full_profile_prompt(self, sample_posts: str) -> str:
+        """Build a single prompt that extracts both voice + full persona profile."""
+
+        return f"""You are a world-class LinkedIn profile analyst and ghostwriter. Analyze these posts from a single author and build their complete professional profile.
+
+Posts to analyze:
+---
+{sample_posts}
+---
+
+Extract ALL of the following in one pass:
+
+1. VOICE PROFILE: A rich paragraph describing exactly how they write — sentence length, structure, vocabulary level, emotional range, formatting habits, signature openers, recurring patterns. This will be used to clone their style precisely.
+
+2. PERSONALITY ARCHETYPES (pick 2-4 that strongly fit):
+   Visionary | Builder | Educator | Challenger | Connector | Analyst | Storyteller | Operator | Pioneer | Mentor | Disruptor | Advocate
+
+3. CORE INTERESTS: 3-6 specific topics they consistently engage with (be specific — not "technology" but "LLM applications" or "developer productivity")
+
+4. EXPERTISE AREAS: 2-4 domains they clearly know deeply
+
+5. CONTENT THEMES: 3-5 specific recurring angles or narratives (e.g. "AI replacing junior jobs", "async-first teams", "building in public")
+
+6. AUDIENCE FIT: 2-4 professional segments who would most benefit from their content
+
+7. KEY WRITING TRAITS: 4-6 specific, observable traits (e.g. "Opens with a contrarian statement", "Uses personal failure as credibility", "Short 1-sentence paragraphs")
+
+8. AVOID: 3-5 things this person would never write
+
+Respond ONLY with valid JSON (no markdown, no explanation):
+{{"voice_profile": "detailed paragraph describing writing style...", "personality": ["Visionary", "Builder"], "interests": ["LLM Applications", "Developer Productivity", "SaaS Growth"], "expertise_areas": ["AI Engineering", "Product-led Growth"], "content_themes": ["AI replacing roles", "Building async teams", "Hiring mistakes"], "audience_fit": ["Founders", "Developers", "Product Managers"], "key_traits": ["Opens with contrarian take", "Uses personal failures as credibility"], "avoid": ["Corporate buzzwords", "Vague motivational advice"]}}"""
+
     def _build_score_prompt(self, content: str) -> str:
         """Build the prompt for post scoring and analysis."""
 
@@ -281,10 +320,11 @@ Respond ONLY with valid JSON (no markdown, no explanation). Format:
         voice_profile: Optional[str] = None,
         audience_segments: Optional[list[str]] = None,
         industry: Optional[str] = None,
+        persona: Optional[dict] = None,
     ) -> dict:
         """Generate LinkedIn posts from a topic."""
 
-        system = self._build_system_prompt(voice_profile, audience_segments, industry)
+        system = self._build_system_prompt(voice_profile, audience_segments, industry, persona)
         user_msg = self._build_generation_prompt(topic, framework, tone, post_count)
 
         raw = await self._call_api(system, user_msg)
@@ -308,10 +348,11 @@ Respond ONLY with valid JSON (no markdown, no explanation). Format:
         voice_profile: Optional[str] = None,
         audience_segments: Optional[list[str]] = None,
         industry: Optional[str] = None,
+        persona: Optional[dict] = None,
     ) -> dict:
         """Repurpose existing content into LinkedIn posts."""
 
-        system = self._build_system_prompt(voice_profile, audience_segments, industry)
+        system = self._build_system_prompt(voice_profile, audience_segments, industry, persona)
         user_msg = self._build_repurpose_prompt(content, source_type, focus_angle, framework, tone, post_count)
 
         raw = await self._call_api(system, user_msg)
@@ -338,6 +379,34 @@ Respond ONLY with valid JSON (no markdown, no explanation). Format:
             "key_traits": parsed.get("key_traits", []),
             "avoid": parsed.get("avoid", []),
         }
+
+    async def analyze_full_profile(self, sample_posts: str) -> dict:
+        """
+        Run a single AI call that extracts both the voice profile (for generation)
+        and the full persona (personality, interests, expertise, themes, audience fit).
+        Returns a dict with voice_profile string and persona dict.
+        """
+        system = (
+            "You are a world-class LinkedIn profile analyst and ghostwriter. "
+            "Extract precise, actionable profiles from writing samples. Output only valid JSON."
+        )
+        user_msg = self._build_full_profile_prompt(sample_posts)
+
+        raw = await self._call_api(system, user_msg)
+        parsed = self._parse_json(raw)
+
+        voice_profile = parsed.get("voice_profile", "")
+        persona = {
+            "personality": parsed.get("personality", []),
+            "interests": parsed.get("interests", []),
+            "expertise_areas": parsed.get("expertise_areas", []),
+            "content_themes": parsed.get("content_themes", []),
+            "audience_fit": parsed.get("audience_fit", []),
+            "key_traits": parsed.get("key_traits", []),
+            "avoid": parsed.get("avoid", []),
+        }
+
+        return {"voice_profile": voice_profile, "persona": persona}
 
     async def score_post(self, content: str) -> dict:
         """Score an existing LinkedIn post."""
