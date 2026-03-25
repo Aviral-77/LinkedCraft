@@ -56,10 +56,19 @@ def init_auth_db():
             linkedin_person_id TEXT,
             linkedin_token_expires_at TEXT,
             voice_profile TEXT,
+            persona_profile TEXT,
             industry TEXT,
             audience_segments TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS linkedin_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            synced_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
         CREATE TABLE IF NOT EXISTS api_keys (
@@ -79,6 +88,15 @@ def init_auth_db():
             PRIMARY KEY (user_id, hour_bucket)
         );
     """)
+
+    # Migrate existing databases — add new columns if they don't exist yet
+    for col, typedef in [("persona_profile", "TEXT")]:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
+
     conn.commit()
     conn.close()
 
@@ -237,6 +255,42 @@ def update_user_profile(user_id: str, voice_profile: str = None, industry: str =
     return True
 
 
+def update_persona_profile(user_id: str, persona_profile: str) -> None:
+    """Save the AI-extracted persona profile (JSON string) for a user."""
+    conn = _get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "UPDATE users SET persona_profile = ?, updated_at = ? WHERE id = ?",
+        (persona_profile, now, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def save_user_posts(user_id: str, posts: list) -> None:
+    """Replace the user's stored LinkedIn posts with a fresh sync."""
+    conn = _get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute("DELETE FROM linkedin_posts WHERE user_id = ?", (user_id,))
+    conn.executemany(
+        "INSERT INTO linkedin_posts (user_id, content, synced_at) VALUES (?, ?, ?)",
+        [(user_id, p, now) for p in posts],
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_user_posts(user_id: str) -> list:
+    """Return stored LinkedIn posts for a user."""
+    conn = _get_db()
+    rows = conn.execute(
+        "SELECT content, synced_at FROM linkedin_posts WHERE user_id = ? ORDER BY id DESC",
+        (user_id,),
+    ).fetchall()
+    conn.close()
+    return [{"content": r["content"], "synced_at": r["synced_at"]} for r in rows]
+
+
 def upgrade_user_tier(user_id: str, tier: str):
     """Upgrade a user's tier (free, pro, enterprise)."""
     if tier not in ("free", "pro", "enterprise"):
@@ -307,7 +361,8 @@ def validate_api_key(key: str) -> Optional[dict]:
     """Validate an API key and return the associated user."""
     conn = _get_db()
     row = conn.execute(
-        """SELECT ak.*, u.email, u.tier, u.voice_profile, u.industry, u.audience_segments,
+        """SELECT ak.*, u.email, u.tier, u.voice_profile, u.persona_profile,
+                  u.industry, u.audience_segments,
                   u.linkedin_access_token, u.linkedin_person_id
            FROM api_keys ak JOIN users u ON ak.user_id = u.id
            WHERE ak.key = ? AND ak.is_active = 1""",
@@ -329,6 +384,7 @@ def validate_api_key(key: str) -> Optional[dict]:
         "email": row["email"],
         "tier": row["tier"],
         "voice_profile": row["voice_profile"],
+        "persona_profile": row["persona_profile"],
         "industry": row["industry"],
         "audience_segments": row["audience_segments"],
         "linkedin_access_token": row["linkedin_access_token"],

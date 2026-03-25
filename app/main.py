@@ -82,6 +82,9 @@ from auth import (
     revoke_api_key,
     update_user_profile,
     update_user_linkedin,
+    update_persona_profile,
+    save_user_posts,
+    get_user_posts,
 )
 from linkedin import (
     get_auth_url,
@@ -184,6 +187,13 @@ async def login(req: LoginRequest):
 @app.get("/auth/me", tags=["Auth"])
 async def get_me(user: dict = Depends(get_current_user)):
     """Get the current authenticated user's profile."""
+    persona = None
+    if user.get("persona_profile"):
+        try:
+            persona = json.loads(user["persona_profile"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     return {
         "user_id": user["user_id"],
         "email": user["email"],
@@ -192,6 +202,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         "has_voice_profile": bool(user.get("voice_profile")),
         "industry": user.get("industry"),
         "audience_segments": user.get("audience_segments"),
+        "persona": persona,
     }
 
 
@@ -311,26 +322,54 @@ class SyncPostsRequest(BaseModel):
 @app.post("/linkedin/sync-posts", tags=["LinkedIn"])
 async def sync_linkedin_posts(req: SyncPostsRequest, user: dict = Depends(require_rate_limit)):
     """
-    Accept posts synced from the LinkedCraft Chrome extension.
-    Runs voice analysis on the posts and saves the profile to the user's account.
-    Called automatically by the extension after it scrapes the user's LinkedIn activity.
+    Accept posts synced from the Chrome extension.
+    1. Stores raw posts in the DB.
+    2. Runs a single AI call to extract voice profile + full persona.
+    3. Saves both to the user's account.
     """
     posts = [p.strip() for p in req.posts if p and p.strip()]
     if not posts:
         raise HTTPException(status_code=400, detail="No valid posts provided")
 
-    sample_posts = "\n\n---\n\n".join(posts[:50])
+    capped = posts[:50]
+    sample_posts = "\n\n---\n\n".join(capped)
 
     try:
-        result = await engine.analyze_voice(sample_posts=sample_posts)
+        # Store raw posts
+        save_user_posts(user_id=user["user_id"], posts=capped)
+
+        # One AI call → voice profile + full persona
+        result = await engine.analyze_full_profile(sample_posts=sample_posts)
+
+        # Persist
         update_user_profile(user_id=user["user_id"], voice_profile=result["voice_profile"])
+        update_persona_profile(user_id=user["user_id"], persona_profile=json.dumps(result["persona"]))
+
         return {
             "status": "synced",
-            "posts_analyzed": len(posts[:50]),
-            "voice_profile": result,
+            "posts_analyzed": len(capped),
+            "voice_profile": result["voice_profile"],
+            "persona": result["persona"],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/linkedin/profile", tags=["LinkedIn"])
+async def get_linkedin_profile_data(user: dict = Depends(get_current_user)):
+    """Return the user's stored persona profile and post count."""
+    persona = None
+    if user.get("persona_profile"):
+        try:
+            persona = json.loads(user["persona_profile"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    posts = get_user_posts(user_id=user["user_id"])
+    return {
+        "persona": persona,
+        "posts_count": len(posts),
+        "has_voice_profile": bool(user.get("voice_profile")),
+    }
 
 
 # ══════════════════════════════════════════════
@@ -354,6 +393,13 @@ async def generate_posts(req: GenerateRequest, user: dict = Depends(require_rate
             except (json.JSONDecodeError, TypeError):
                 audiences = []
 
+        persona = None
+        if user.get("persona_profile"):
+            try:
+                persona = json.loads(user["persona_profile"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         result = await engine.generate(
             topic=req.topic,
             framework=req.framework,
@@ -362,6 +408,7 @@ async def generate_posts(req: GenerateRequest, user: dict = Depends(require_rate
             voice_profile=voice,
             audience_segments=audiences,
             industry=industry,
+            persona=persona,
         )
         return result
     except Exception as e:
@@ -375,6 +422,13 @@ async def repurpose_content(req: RepurposeRequest, user: dict = Depends(require_
         voice = req.voice_profile or user.get("voice_profile")
         industry = req.industry or user.get("industry")
 
+        persona = None
+        if user.get("persona_profile"):
+            try:
+                persona = json.loads(user["persona_profile"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         result = await engine.repurpose(
             content=req.content,
             source_type=req.source_type,
@@ -385,6 +439,7 @@ async def repurpose_content(req: RepurposeRequest, user: dict = Depends(require_
             voice_profile=voice,
             audience_segments=req.audience_segments,
             industry=industry,
+            persona=persona,
         )
         return result
     except Exception as e:
